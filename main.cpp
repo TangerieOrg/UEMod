@@ -121,8 +121,10 @@ public:
 		LOG("Size = {}", code_size);
 		LOG("Code = {}", (void*)Stack.Code());
 		auto t = std::bit_cast<FFrame_50_AndBelow*>(&Stack);
+		// TODO => Change to inserting a EX_Jump after params are read
+		// Bytes are EX_JUMP, uint32_t
+		// Stack.Code = &Stack.Node->Script[Offset];
 		t->Code += code_size - 3;
-		//auto t = (uint32_t)script_def;
 		LOG("Data = {}", (void*)script_def);
 		LOG("Code = {}", (void*)Stack.Code());
 		CALL_BPFUNCTION(HeyImATest);
