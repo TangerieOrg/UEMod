@@ -9,7 +9,7 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${TestModOutputDir})
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${TestModOutputDir})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${TestModOutputDir})
 
-add_library(${TARGET} SHARED "main.cpp" "Debug/DebugHooks.cpp")
+add_library(${TARGET} SHARED "main.cpp" "Debug/DebugHooks.cpp" "Util/Kismet.cpp" "Util/Extensions.cpp")
 
 set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME main)
 

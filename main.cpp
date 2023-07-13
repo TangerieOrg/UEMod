@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string>
 #include <Mod/CppUserModBase.hpp>
 #include <DynamicOutput/DynamicOutput.hpp>
 #include <Unreal/UObjectGlobals.hpp>
@@ -16,32 +17,13 @@
 #include "Debug/DebugHooks.hpp"
 #include "Macros.hpp"
 #include "Util/Kismet.hpp"
+#include "Util/Extensions.hpp"
 
 using namespace RC;
 using namespace RC::Unreal;
 
-
 namespace Tangerie {
-
-	template <class T> void SetReturnParameter(Unreal::FOutParmRec* OutParms, const wchar_t* ParamName, const T& NewValue) {
-		// ensure FOutParmRec has expected properties
-		struct FOutParmRecExtended : Unreal::FOutParmRec {
-			Unreal::FProperty* Property;
-			Unreal::uint8* PropAddr;
-			Unreal::FOutParmRec* NextOutParm;
-		};
-		// iterate over outparms to set the deired param's pointer's value to newvalue
-		auto CurrentOutParam = reinterpret_cast<FOutParmRecExtended*>(OutParms);
-		while (CurrentOutParam && CurrentOutParam->Property) {
-			// make sure that we only edit the correct property
-			if (CurrentOutParam->Property->GetName() == ParamName) {
-				// cast CurrentOutParam to NewValue's T and set the value
-				*reinterpret_cast<T*>(CurrentOutParam->PropAddr) = NewValue;
-			}
-			// set CurrentOutParam for the next iteration / or stop the loop if nullptr
-			CurrentOutParam = reinterpret_cast<FOutParmRecExtended*>(CurrentOutParam->NextOutParm);
-		}
-	}
+using namespace Extensions;
 
 class TestMod : public CppUserModBase
 {
@@ -65,37 +47,35 @@ public:
 			FName NameInput;
 		};
 
-		auto params = (Params*)(Stack.Locals());
+		auto params = Stack->ExGetLocals<Params>();
 
 		LOG("NameInput = {}", params->NameInput.ToString());
 
-		SetReturnParameter(Stack.OutParms(), L"NameOutput", FName(STR("Updated Name")));
-		SetReturnParameter(Stack.OutParms(), L"BoolOutput", true);
+		Stack->ExSetOutParam(STR("NameOutput"), FName(STR("Updated Name")));
+		Stack->ExSetOutParam(STR("BoolOutput"), true);
 	}
 
 	static BPFUNCTION(PrintToModLoader) {
-		auto node = Stack.Node();
-
 		struct Params {
 			FString Message;
 		};
 
-		decltype(auto) params = (Params*)(Stack.Locals());
+		auto params = Stack->ExGetLocals<Params>();
 
-		LOG("[LOG] {}", params->Message.GetCharArray());
+		LOG("[{}] {}", Context->GetClassPrivate()->GetName(), params->Message.GetCharArray());
 	}
 
 	// Lua was Script Hook
 	// LuaMod::m_script_hook_callbacks
 	static BPFUNCTION(TestFunctionStuff) {
-		decltype(auto) node = Stack.Node();
+		decltype(auto) node = Stack->Node();
 
 		struct Params {
 			bool BoolInput;
 			FName NameInput;
 		};
 
-		decltype(auto) params = (Params*)(Stack.Locals());
+		auto params = Stack->ExGetLocals<Params>();
 
 		LOG("[HeyImATest] \"{}\"", params->NameInput.ToString());
 		for (decltype(auto) param : node->ForEachProperty()) {
@@ -104,13 +84,14 @@ public:
 
 		decltype(auto) prop = node->FindProperty(FName(STR("NameOutput")));
 		if (!prop) return;
-		LOG("Output = {}", prop->ContainerPtrToValuePtr<FName>(Stack.Locals())->ToString());
+		LOG("Output = {}", prop->ContainerPtrToValuePtr<FName>(Stack->Locals())->ToString());
 
 	}
 
 
-	static BPFUNCTION(HandleLocalPre) {
-		auto fn = Stack.Node();
+	static void HandleLocalPre(UObject* Context, FFrame& _Stack, void* RESULT_DECL) {
+		decltype(auto) Stack = reinterpret_cast<FFrameExtended*>(&_Stack);
+		auto fn = Stack->Node();
 		auto nodeName = fn->GetName();
 		if (nodeName != STR("HeyImATest")) return;
 		LOG("Pre Exec HeyImATest");
@@ -119,37 +100,82 @@ public:
 		auto code_size = fn->GetScript().Num();
 
 		LOG("Size = {}", code_size);
-		LOG("Code = {}", (void*)Stack.Code());
+		LOG("Code = {}", (void*)Stack->Code());
 		auto t = std::bit_cast<FFrame_50_AndBelow*>(&Stack);
 		// TODO => Change to inserting a EX_Jump after params are read
 		// Bytes are EX_JUMP, uint32_t
-		// Stack.Code = &Stack.Node->Script[Offset];
+		// Stack->Code = &Stack->Node->Script[Offset];
 		t->Code += code_size - 3;
 		LOG("Data = {}", (void*)script_def);
-		LOG("Code = {}", (void*)Stack.Code());
+		LOG("Code = {}", (void*)Stack->Code());
 		CALL_BPFUNCTION(HeyImATest);
 	}
 
-	static BPFUNCTION(HandleLocalPost) {
-		auto nodeName = Stack.Node()->GetName();
+	static void HandleLocalPost(UObject* Context, FFrame& _Stack, void* RESULT_DECL) {
+		FFrameExtended* Stack = reinterpret_cast<FFrameExtended*>(&_Stack);
+		auto nodeName = Stack->Node()->GetName();
 		//if (nodeName == STR("PrintToModLoader")) PrintToModLoader(Context, Stack, RESULT_DECL);
 		if (nodeName == STR("PrintToModLoader")) CALL_BPFUNCTION(PrintToModLoader);
-		if (nodeName == STR("HeyImATest")) {
-			auto fn = Stack.Node();
+		/*if (nodeName == STR("HeyImATest")) {
+			auto fn = Stack->Node();
 			uint8_t* script_def = fn->GetScript().GetData();
 			auto code_size = fn->GetScript().Num();
-			size_t index = Stack.Code() - fn->GetScript().GetData() - 1;
+			size_t index = Stack->Code() - fn->GetScript().GetData() - 1;
 			LOG("Size = {}", code_size);
-			LOG("Code = {}", (void*)Stack.Code());
+			LOG("Code = {}", (void*)Stack->Code());
 			LOG("Data = {}", (void*)script_def);
+		}*/
+
+		if (nodeName == STR("SomeInterfaceFunction")) {
+			auto BPGen = Context->GetClassPrivate();
+			for (auto interf : BPGen->GetInterfaces()) {
+				if (interf.Class->GetName() == STR("CPPTestInterface_C")) {
+					LOG("Found Matching Function");
+					Stack->ExSetOutParam(STR("StringOutput"), FString(STR("Modded Out")));
+				}
+			}
+
+		}
+	}
+
+	static void HandlePostConstruct(const FStaticConstructObjectParameters& Params, UObject* ConstructedObject) {
+		UClass* classPrivate = ConstructedObject->GetClassPrivate();
+		if (!classPrivate) return;
+		if (classPrivate->IsA<UBlueprintGeneratedClass>()) {
+			auto BPGen = reinterpret_cast<UBlueprintGeneratedClassExtended*>(classPrivate);
+			if (BPGen->ExHasInterface(L"CPPTestInterface_C")) {
+				LOG("Found Matching Class With Ex | {}", classPrivate->GetFullName());
+			}
+			
+		}
+		return;
+
+		// Functions
+		if (false && ConstructedObject->GetClassPrivate()->GetFullName() == STR("Class /Script/CoreUObject.Function")) {
+			LOG("=== FUNCTION ===");
+			LOG_EXPR(ConstructedObject->GetFullName());
+			LOG_EXPR(ConstructedObject->GetClassPrivate()->GetFullName());
+			LOG_EXPR(ConstructedObject->GetOuterPrivate()->GetFullName());
+			LOG_EXPR(ConstructedObject->GetOuterPrivate()->GetClassPrivate()->GetFullName());
+		}
+		
+		if (ConstructedObject->GetClassPrivate()->GetFullName() == STR("Class /Script/Engine.BlueprintGeneratedClass")) {
+			if (ConstructedObject->GetName() == STR("CPPTestInterface_C")) {
+				LOG("=== CPPTestInterface_C ===");
+				LOG_EXPR(ConstructedObject->GetFullName());
+			}
 		}
 	}
 
 
-
 	void on_unreal_init() override {
+		//Hook::RegisterProcessLocalScriptFunctionPreCallback(TRY_WRAP(HandleLocalPre));
 		Hook::RegisterProcessLocalScriptFunctionPostCallback(TRY_WRAP(HandleLocalPost));
-		Hook::RegisterProcessLocalScriptFunctionPreCallback(TRY_WRAP(HandleLocalPre));
+		
+		Hook::RegisterStaticConstructObjectPostCallback([](const FStaticConstructObjectParameters& Params, UObject* ConstructedObject) {
+			TRY_WRAP(HandlePostConstruct)(Params, ConstructedObject);
+			return ConstructedObject;
+		});
 	}
 
 
@@ -171,13 +197,11 @@ extern "C"
 {
 	MY_AWESOME_MOD_API RC::CppUserModBase* start_mod()
 	{
-		Output::send<LogLevel::Warning>(L"Test Mod Installed\n");
 		return new Tangerie::TestMod();
 	}
 
 	MY_AWESOME_MOD_API void uninstall_mod(RC::CppUserModBase* mod)
 	{
-		Output::send<LogLevel::Warning>(L"Test Mod Uninstalled\n");
 		delete mod;
 	}
 }
