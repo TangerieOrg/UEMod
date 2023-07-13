@@ -1,7 +1,8 @@
 #include "Kismet.hpp"
+#include <Helpers/String.hpp>
 
 namespace Tangerie::Util {
-auto expr_to_string(RC::Unreal::EExprToken expr) -> const char*
+const char* _expr_to_string(RC::Unreal::EExprToken expr)
 {
 	using namespace RC::Unreal;
 	switch (expr)
@@ -199,4 +200,8 @@ auto expr_to_string(RC::Unreal::EExprToken expr) -> const char*
 	}
 	return "unknown";
 };
+
+std::wstring expr_to_string(RC::Unreal::EExprToken expr) {
+	return RC::to_wstring(_expr_to_string(expr));
+}
 }

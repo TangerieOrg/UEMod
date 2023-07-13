@@ -89,34 +89,43 @@ public:
 	}
 
 
+	//static void HandleLocalPre(UObject* Context, FFrame& _Stack, void* RESULT_DECL) {
+	//	decltype(auto) Stack = reinterpret_cast<FFrameExtended*>(&_Stack);
+	//	auto fn = Stack->Node();
+	//	auto nodeName = fn->GetName();
+	//	if (nodeName != STR("HeyImATest")) return;
+	//	LOG("Pre Exec HeyImATest");
+
+	//	uint8_t* script_def = fn->GetScript().GetData();
+	//	auto code_size = fn->GetScript().Num();
+
+	//	LOG("Size = {}", code_size);
+	//	LOG("Code = {}", (void*)Stack->Code());
+	//	auto t = std::bit_cast<FFrame_50_AndBelow*>(&Stack);
+	//	// TODO => Change to inserting a EX_Jump after params are read
+	//	// Bytes are EX_JUMP, uint32_t
+	//	// Stack->Code = &Stack->Node->Script[Offset];
+	//	t->Code += code_size - 3;
+	//	LOG("Data = {}", (void*)script_def);
+	//	LOG("Code = {}", (void*)Stack->Code());
+	//	CALL_BPFUNCTION(HeyImATest);
+	//}
+
 	static void HandleLocalPre(UObject* Context, FFrame& _Stack, void* RESULT_DECL) {
 		decltype(auto) Stack = reinterpret_cast<FFrameExtended*>(&_Stack);
 		auto fn = Stack->Node();
 		auto nodeName = fn->GetName();
-		if (nodeName != STR("HeyImATest")) return;
-		LOG("Pre Exec HeyImATest");
 
-		uint8_t* script_def = fn->GetScript().GetData();
-		auto code_size = fn->GetScript().Num();
-
-		LOG("Size = {}", code_size);
-		LOG("Code = {}", (void*)Stack->Code());
-		auto t = std::bit_cast<FFrame_50_AndBelow*>(&Stack);
-		// TODO => Change to inserting a EX_Jump after params are read
-		// Bytes are EX_JUMP, uint32_t
-		// Stack->Code = &Stack->Node->Script[Offset];
-		t->Code += code_size - 3;
-		LOG("Data = {}", (void*)script_def);
-		LOG("Code = {}", (void*)Stack->Code());
-		CALL_BPFUNCTION(HeyImATest);
+		if (nodeName != STR("SomeInterfaceFunction")) return;
+		LOG("=== Pre Out Params ===");
+		auto CurrentOutParam = Stack->OutParms();
+		while (CurrentOutParam && CurrentOutParam->Property) {
+			LOG("    - {}", CurrentOutParam->Property->GetName());
+			CurrentOutParam = CurrentOutParam->NextOutParm;
+		}
 	}
 
-	static void HandleLocalPost(UObject* Context, FFrame& _Stack, void* RESULT_DECL) {
-		FFrameExtended* Stack = reinterpret_cast<FFrameExtended*>(&_Stack);
-		auto nodeName = Stack->Node()->GetName();
-		//if (nodeName == STR("PrintToModLoader")) PrintToModLoader(Context, Stack, RESULT_DECL);
-		if (nodeName == STR("PrintToModLoader")) CALL_BPFUNCTION(PrintToModLoader);
-		/*if (nodeName == STR("HeyImATest")) {
+	/*if (nodeName == STR("HeyImATest")) {
 			auto fn = Stack->Node();
 			uint8_t* script_def = fn->GetScript().GetData();
 			auto code_size = fn->GetScript().Num();
@@ -126,17 +135,37 @@ public:
 			LOG("Data = {}", (void*)script_def);
 		}*/
 
-		if (nodeName == STR("SomeInterfaceFunction")) {
-			auto BPGen = Context->GetClassPrivate();
-			for (auto interf : BPGen->GetInterfaces()) {
-				if (interf.Class->GetName() == STR("CPPTestInterface_C")) {
-					LOG("Found Matching Function");
+	static void HandleLocalPost(UObject* Context, FFrame& _Stack, void* RESULT_DECL) {
+		FFrameExtended* Stack = reinterpret_cast<FFrameExtended*>(&_Stack);
+		auto nodeName = Stack->Node()->GetName();
+		if (nodeName == STR("PrintToModLoader")) CALL_BPFUNCTION(PrintToModLoader);
+		
+		if (Context->GetClassPrivate()->IsA<UBlueprintGeneratedClass>()) {
+			auto BPGen = reinterpret_cast<UBlueprintGeneratedClassExtended*>(Context->GetClassPrivate());
+			if (nodeName == STR("SomeInterfaceFunction")) {
+				if (BPGen->ExHasInterface(STR("CPPTestInterface_C"))) {
+					struct Param {
+						FString StringInput;
+					};
+
+					LOG("Input = {}", Stack->ExGetLocals<Param>()->StringInput.GetCharArray());
 					Stack->ExSetOutParam(STR("StringOutput"), FString(STR("Modded Out")));
 				}
+				LOG("=== Post Out Params ===");
+				auto CurrentOutParam = Stack->OutParms();
+				while (CurrentOutParam && CurrentOutParam->Property) {
+					LOG("    - {}", CurrentOutParam->Property->GetName());
+					CurrentOutParam = CurrentOutParam->NextOutParm;
+				}
 			}
-
 		}
 	}
+
+	/*
+	EX_Return
+	EX_Nothing
+	EX_EndOfScript
+	*/
 
 	static void HandlePostConstruct(const FStaticConstructObjectParameters& Params, UObject* ConstructedObject) {
 		UClass* classPrivate = ConstructedObject->GetClassPrivate();
@@ -145,6 +174,17 @@ public:
 			auto BPGen = reinterpret_cast<UBlueprintGeneratedClassExtended*>(classPrivate);
 			if (BPGen->ExHasInterface(L"CPPTestInterface_C")) {
 				LOG("Found Matching Class With Ex | {}", classPrivate->GetFullName());
+				for (auto fn : BPGen->ForEachFunction()) {
+					LOG("    - {}", fn->GetName());
+					if (fn->GetName() == STR("SomeInterfaceFunction")) {
+						uint8_t* script_def = fn->GetScript().GetData();
+						LOG("I = {}", Util::expr_to_string((EExprToken)*script_def));
+						// Might cause issues due to alignment
+						script_def[0] = EX_Return;
+						script_def[1] = EX_Nothing;
+						script_def[2] = EX_EndOfScript;
+					}
+				}
 			}
 			
 		}
