@@ -14,7 +14,7 @@
 #include <Unreal/FText.hpp>
 #include <Unreal/FProperty.hpp>
 #include <Constructs/Loop.hpp>
-#include "Debug/DebugHooks.hpp"
+#include <ExceptionHandling.hpp>
 #include "Macros.hpp"
 #include "Util/Kismet.hpp"
 #include "Util/Extensions.hpp"
@@ -65,52 +65,6 @@ public:
 		LOG("[{}] {}", Context->GetClassPrivate()->GetName(), params->Message.GetCharArray());
 	}
 
-	// Lua was Script Hook
-	// LuaMod::m_script_hook_callbacks
-	static BPFUNCTION(TestFunctionStuff) {
-		decltype(auto) node = Stack->Node();
-
-		struct Params {
-			bool BoolInput;
-			FName NameInput;
-		};
-
-		auto params = Stack->ExGetLocals<Params>();
-
-		LOG("[HeyImATest] \"{}\"", params->NameInput.ToString());
-		for (decltype(auto) param : node->ForEachProperty()) {
-			LOG("	{} {}", param->GetClass().GetName(), param->GetName());
-		}
-
-		decltype(auto) prop = node->FindProperty(FName(STR("NameOutput")));
-		if (!prop) return;
-		LOG("Output = {}", prop->ContainerPtrToValuePtr<FName>(Stack->Locals())->ToString());
-
-	}
-
-
-	//static void HandleLocalPre(UObject* Context, FFrame& _Stack, void* RESULT_DECL) {
-	//	decltype(auto) Stack = reinterpret_cast<FFrameExtended*>(&_Stack);
-	//	auto fn = Stack->Node();
-	//	auto nodeName = fn->GetName();
-	//	if (nodeName != STR("HeyImATest")) return;
-	//	LOG("Pre Exec HeyImATest");
-
-	//	uint8_t* script_def = fn->GetScript().GetData();
-	//	auto code_size = fn->GetScript().Num();
-
-	//	LOG("Size = {}", code_size);
-	//	LOG("Code = {}", (void*)Stack->Code());
-	//	auto t = std::bit_cast<FFrame_50_AndBelow*>(&Stack);
-	//	// TODO => Change to inserting a EX_Jump after params are read
-	//	// Bytes are EX_JUMP, uint32_t
-	//	// Stack->Code = &Stack->Node->Script[Offset];
-	//	t->Code += code_size - 3;
-	//	LOG("Data = {}", (void*)script_def);
-	//	LOG("Code = {}", (void*)Stack->Code());
-	//	CALL_BPFUNCTION(HeyImATest);
-	//}
-
 	static void HandleLocalPre(UObject* Context, FFrame& _Stack, void* RESULT_DECL) {
 		decltype(auto) Stack = reinterpret_cast<FFrameExtended*>(&_Stack);
 		auto fn = Stack->Node();
@@ -124,16 +78,6 @@ public:
 			CurrentOutParam = CurrentOutParam->NextOutParm;
 		}
 	}
-
-	/*if (nodeName == STR("HeyImATest")) {
-			auto fn = Stack->Node();
-			uint8_t* script_def = fn->GetScript().GetData();
-			auto code_size = fn->GetScript().Num();
-			size_t index = Stack->Code() - fn->GetScript().GetData() - 1;
-			LOG("Size = {}", code_size);
-			LOG("Code = {}", (void*)Stack->Code());
-			LOG("Data = {}", (void*)script_def);
-		}*/
 
 	static void HandleLocalPost(UObject* Context, FFrame& _Stack, void* RESULT_DECL) {
 		FFrameExtended* Stack = reinterpret_cast<FFrameExtended*>(&_Stack);
@@ -174,10 +118,12 @@ public:
 			auto BPGen = reinterpret_cast<UBlueprintGeneratedClassExtended*>(classPrivate);
 			if (BPGen->ExHasInterface(L"CPPTestInterface_C")) {
 				LOG("Found Matching Class With Ex | {}", classPrivate->GetFullName());
+
 				for (auto fn : BPGen->ForEachFunction()) {
 					LOG("    - {}", fn->GetName());
-					if (fn->GetName() == STR("SomeInterfaceFunction")) {
+					if (false && fn->GetName() == STR("SomeInterfaceFunction")) {
 						uint8_t* script_def = fn->GetScript().GetData();
+						//fn->GetScript().SetNum(3);
 						LOG("I = {}", Util::expr_to_string((EExprToken)*script_def));
 						// Might cause issues due to alignment
 						script_def[0] = EX_Return;
@@ -213,7 +159,7 @@ public:
 		Hook::RegisterProcessLocalScriptFunctionPostCallback(TRY_WRAP(HandleLocalPost));
 		
 		Hook::RegisterStaticConstructObjectPostCallback([](const FStaticConstructObjectParameters& Params, UObject* ConstructedObject) {
-			TRY_WRAP(HandlePostConstruct)(Params, ConstructedObject);
+			//TRY_WRAP(HandlePostConstruct)(Params, ConstructedObject);
 			return ConstructedObject;
 		});
 	}

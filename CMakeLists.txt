@@ -1,18 +1,17 @@
 cmake_minimum_required(VERSION 3.18)
 
-set(TARGET TestMod)
-project(${TARGET})
+project(MyMods)
 
-set(TestModOutputDir ${CMAKE_SOURCE_DIR}/Output/${TARGET})
+# Download xrepo.cmake if not exists in build directory.
+if(NOT EXISTS "${CMAKE_BINARY_DIR}/xrepo.cmake")
+    message(STATUS "Downloading xrepo.cmake from https://github.com/xmake-io/xrepo-cmake/")
+    # mirror https://cdn.jsdelivr.net/gh/xmake-io/xrepo-cmake@main/xrepo.cmake
+    file(DOWNLOAD "https://raw.githubusercontent.com/xmake-io/xrepo-cmake/main/xrepo.cmake"
+                  "${CMAKE_BINARY_DIR}/xrepo.cmake"
+                  TLS_VERIFY ON)
+endif()
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${TestModOutputDir})
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${TestModOutputDir})
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${TestModOutputDir})
+# Include xrepo.cmake so we can use xrepo_package function.
+include(${CMAKE_BINARY_DIR}/xrepo.cmake)
 
-add_library(${TARGET} SHARED "main.cpp" "Debug/DebugHooks.cpp" "Util/Kismet.cpp" "Util/Extensions.cpp")
-
-set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME main)
-
-
-target_include_directories(${TARGET} PRIVATE .)
-target_link_libraries(${TARGET} PUBLIC cppsdk xinput1_3)
+add_subdirectory(TestMod)
