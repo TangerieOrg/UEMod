@@ -5,28 +5,19 @@
 #include <Unreal/UClass.hpp>
 #include <Unreal/FFrame.hpp>
 
-/*
-struct FOutParmRecExtended : Unreal::FOutParmRec {
-	Unreal::FProperty* Property;
-	Unreal::uint8* PropAddr;
-	Unreal::FOutParmRec* NextOutParm;
-};
-*/
-
 using namespace RC;
 using namespace RC::Unreal;
 
 namespace Tangerie::Extensions {
-
-struct UBlueprintGeneratedClassExtended : public UBlueprintGeneratedClass {
-	bool ExHasInterface(std::wstring const& InterfaceName);
-};
-
-
 struct FOutParmRecExtended : public FOutParmRec {
 	FProperty* Property;
 	uint8_t* PropAddr;
 	FOutParmRecExtended* NextOutParm;
+};
+
+
+struct UBlueprintGeneratedClassExtended : public UBlueprintGeneratedClass {
+	bool ExHasInterface(std::wstring const& InterfaceName);
 };
 
 struct FFrameExtended : public FFrame {

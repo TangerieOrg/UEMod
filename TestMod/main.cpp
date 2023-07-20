@@ -17,7 +17,7 @@
 #include <ExceptionHandling.hpp>
 #include "Macros.hpp"
 #include "Util/Kismet.hpp"
-#include "Util/Extensions.hpp"
+#include <UEUtils/Extensions.hpp>
 
 using namespace RC;
 using namespace RC::Unreal;

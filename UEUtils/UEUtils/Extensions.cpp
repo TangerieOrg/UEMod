@@ -2,7 +2,7 @@
 
 namespace Tangerie::Extensions {
 
-bool UBlueprintGeneratedClassExtended::ExHasInterface(std::wstring const &InterfaceName)
+bool UBlueprintGeneratedClassExtended::ExHasInterface(std::wstring const& InterfaceName)
 {
 	if (this->GetInterfaces().Num() == 0) return false;
 	for (auto interf : this->GetInterfaces()) {

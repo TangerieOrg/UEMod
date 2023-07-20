@@ -4,7 +4,7 @@
 #include <Unreal/UObjectGlobals.hpp>
 #include <Unreal/UObject.hpp>
 #include <Unreal/FFrame.hpp>
-#include <Util/Extensions.hpp>
+#include <UEUtils/Extensions.hpp>
 
 
 #define LOG(S, ...) { Output::send<LogLevel::Normal>(STR("[TestMod] ") STR(##S) STR("\n"), __VA_ARGS__); }
