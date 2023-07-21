@@ -174,9 +174,7 @@ public:
 	}
 };
 
-
 }
-
 
 #define MY_AWESOME_MOD_API __declspec(dllexport)
 extern "C"
