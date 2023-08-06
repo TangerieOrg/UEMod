@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 #include <Unreal/UObjectGlobals.hpp>
-#include <Unreal/FProperty.hpp>
 #include <Unreal/UClass.hpp>
 #include <Unreal/FFrame.hpp>
 
@@ -21,10 +20,22 @@ struct UBlueprintGeneratedClassExtended : public UBlueprintGeneratedClass {
 };
 
 struct FFrameExtended : public FFrame {
-	FOutParmRecExtended* OutParms() { return reinterpret_cast<FOutParmRecExtended*>(FFrame::OutParms()); }
+	inline FOutParmRecExtended* OutParms() { return reinterpret_cast<FOutParmRecExtended*>(FFrame::OutParms()); }
 
 	template <typename T>
-	T* ExGetOutParam(std::wstring const& ParamName) {
+	inline T* ExGetOutFProperty(std::wstring const& ParamName) {
+		auto CurrentOutParam = this->OutParms();
+		while (CurrentOutParam && CurrentOutParam->Property) {
+			if (CurrentOutParam->Property->GetName() == ParamName) {
+				return CurrentOutParam->Property;
+			}
+			CurrentOutParam = CurrentOutParam->NextOutParm;
+		}
+		return nullptr;
+	}
+
+	template <typename T>
+	inline T* ExGetOutParam(std::wstring const& ParamName) {
 		auto CurrentOutParam = this->OutParms();
 		while (CurrentOutParam && CurrentOutParam->Property) {
 			if (CurrentOutParam->Property->GetName() == ParamName) {
@@ -36,7 +47,7 @@ struct FFrameExtended : public FFrame {
 	}
 
 	template <typename T>
-	bool ExSetOutParam(std::wstring const& ParamName, const T& NewValue) {
+	inline bool ExSetOutParam(std::wstring const& ParamName, const T& NewValue) {
 		auto outParam = this->ExGetOutParam<T>(ParamName);
 		if (!outParam) return false;
 		*outParam = NewValue;
@@ -44,6 +55,6 @@ struct FFrameExtended : public FFrame {
 	}
 
 	template<typename T>
-	T* ExGetLocals() { return (T*)this->Locals(); }
+	inline T* ExGetLocals() { return (T*)this->Locals(); }
 };
 }
